@@ -29,6 +29,12 @@ joystick_t joystick_state = {
             0
 #endif
         },
+    .axes_enabled =
+        {
+#if JOYSTICK_AXIS_COUNT > 0
+            false
+#endif
+        },
 #ifdef JOYSTICK_HAS_HAT
     .hat = -1,
 #endif
@@ -132,6 +138,10 @@ void joystick_read_axes(void) {
             continue;
         }
 
+        if (!joystick_axis_is_enabled(i)) {
+            continue;
+        }
+
         joystick_set_axis(i, joystick_read_axis(i));
     }
 
@@ -146,6 +156,21 @@ void joystick_set_axis(uint8_t axis, int16_t value) {
         joystick_state.axes[axis] = value;
         joystick_state.dirty      = true;
     }
+}
+
+void joystick_set_axis_enabled(uint8_t axis, bool enabled) {
+    if (axis >= JOYSTICK_AXIS_COUNT) return;
+
+    if (enabled != joystick_state.axes_enabled[axis]) {
+        joystick_state.axes_enabled[axis] = enabled;
+        joystick_state.dirty      = true;
+    }
+}
+
+bool joystick_axis_is_enabled(uint8_t axis) {
+    if (axis >= JOYSTICK_AXIS_COUNT) return false;
+
+    return joystick_state.axes_enabled[axis];
 }
 
 #ifdef JOYSTICK_HAS_HAT

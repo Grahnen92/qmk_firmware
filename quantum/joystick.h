@@ -83,6 +83,7 @@ extern joystick_config_t joystick_axes[JOYSTICK_AXIS_COUNT];
 typedef struct {
     uint8_t buttons[(JOYSTICK_BUTTON_COUNT - 1) / 8 + 1];
     int16_t axes[JOYSTICK_AXIS_COUNT];
+    bool axes_enabled[JOYSTICK_AXIS_COUNT];
 #ifdef JOYSTICK_HAS_HAT
     int8_t hat;
 #endif
@@ -141,6 +142,22 @@ void joystick_read_axes(void);
  * \param value The value to set.
  */
 void joystick_set_axis(uint8_t axis, int16_t value);
+
+/**
+ * \brief Set the value of the given axis.
+ *
+ * \param axis The axis to set the value of.
+ * \param value The value to set.
+ */
+void joystick_set_axis_enabled(uint8_t axis, bool enabled);
+
+/**
+ * \brief Set the value of the given axis.
+ *
+ * \param axis The axis to set the value of.
+ * \param value The value to set.
+ */
+bool joystick_axis_is_enabled(uint8_t axis);
 
 /**
  * \brief Set the position of the hat switch.

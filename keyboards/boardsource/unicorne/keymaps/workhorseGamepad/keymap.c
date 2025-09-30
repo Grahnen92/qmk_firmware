@@ -8,10 +8,11 @@
 //include "analog_joystick.h"
 #include "analog.h"
 #include "gpio.h"
+#include "keymap_swedish.h"
 
 joystick_config_t joystick_axes[JOYSTICK_AXIS_COUNT] = {
-    [0] = JOYSTICK_AXIS_IN(ANALOG_JOYSTICK_X_AXIS_PIN, 900, 575, 285),
-    [1] = JOYSTICK_AXIS_IN(ANALOG_JOYSTICK_Y_AXIS_PIN, 900, 575, 285),
+    [0] = JOYSTICK_AXIS_IN(ANALOG_JOYSTICK_X_AXIS_PIN, 1023, 512, 0),
+    [1] = JOYSTICK_AXIS_IN(ANALOG_JOYSTICK_Y_AXIS_PIN, 1023, 512, 0),
     [2] = JOYSTICK_AXIS_VIRTUAL, // RT
     [3] = JOYSTICK_AXIS_VIRTUAL, //left x
     [4] = JOYSTICK_AXIS_VIRTUAL, //left y
@@ -21,10 +22,10 @@ joystick_config_t joystick_axes[JOYSTICK_AXIS_COUNT] = {
 bool sendMouseReports = false;
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
-    if (!sendMouseReports) {
+    if (layer_state_is(4)) {
         // Ignore mouse reports when in joystick mode
         mouse_report.x = 0;
-        mouse_report.y = 0;
+        mouse_report.y = 0; 
     }
      return mouse_report;
 }
@@ -95,38 +96,70 @@ int16_t Scale_0_Max_to_NegRange_Range(int Value)
 
 void housekeeping_task_user(void) 
 {
-    if(is_keyboard_master())
+    if (layer_state_is(4))
     {
+        if(!joystick_axis_is_enabled(0))
         {
-            //static uint32_t last_sync2 = 0;
-            //if (timer_elapsed32(last_sync2) > 1) 
+            joystick_set_axis_enabled((uint8_t) 0, true);
+            joystick_set_axis_enabled((uint8_t) 1, true);
+            joystick_set_axis_enabled((uint8_t) 2, true);
+            joystick_set_axis_enabled((uint8_t) 3, true);
+            joystick_set_axis_enabled((uint8_t) 4, true);
+            joystick_set_axis_enabled((uint8_t) 5, true);
+        }
+
+        if(is_keyboard_master())
+        {
             {
-                master_to_slave_t m2s = {6};
-                slave_to_master_t s2m = {0, 0, 0};
-                if(transaction_rpc_exec(USER_SYNC_A, sizeof(m2s), &m2s, sizeof(s2m), &s2m)) 
+                //static uint32_t last_sync2 = 0;
+                //if (timer_elapsed32(last_sync2) > 1) 
                 {
-                    const int16_t slaveX = Scale_0_Max_to_NegRange_Range(s2m.x);
-                    const int16_t slaveY = Scale_0_Max_to_NegRange_Range(s2m.y);
-                    dprintf("Slave value: %d %d\n", slaveX, slaveY);
+                    master_to_slave_t m2s = {6};
+                    slave_to_master_t s2m = {0, 0, 0};
+                    if(transaction_rpc_exec(USER_SYNC_A, sizeof(m2s), &m2s, sizeof(s2m), &s2m)) 
+                    {
+                        const int16_t slaveX = Scale_0_Max_to_NegRange_Range(s2m.x);
+                        const int16_t slaveY = Scale_0_Max_to_NegRange_Range(s2m.y);
+                        dprintf("Slave value: %d %d\n", slaveX, slaveY);
 
-                    //last_sync2 = timer_read32();
-                    joystick_set_axis((uint8_t) 2, 0);
-                    joystick_set_axis((uint8_t) 3, slaveX);
-                    joystick_set_axis((uint8_t) 4, slaveY);
-                    joystick_set_axis((uint8_t) 5, 0);
+                        //last_sync2 = timer_read32();
+                        joystick_set_axis((uint8_t) 2, 0);
+                        joystick_set_axis((uint8_t) 3, slaveX);
+                        joystick_set_axis((uint8_t) 4, slaveY);
+                        joystick_set_axis((uint8_t) 5, 0);
 
 
-                } else 
-                {
-                    dprint("Slave sync failed!\n");
+                    } else 
+                    {
+                        dprint("Slave sync failed!\n");
+                    }
                 }
             }
+        }
+        else
+        {
+            joystickData.x = (int) analogReadPin(ANALOG_JOYSTICK_X_AXIS_PIN); // Read and convert joystick X-axis data
+            joystickData.y = (int) analogReadPin(ANALOG_JOYSTICK_Y_AXIS_PIN); // Read and convert joystick Y-axis data    
         }
     }
     else
     {
-        joystickData.x = (int) analogReadPin(ANALOG_JOYSTICK_X_AXIS_PIN); // Read and convert joystick X-axis data
-        joystickData.y = (int) analogReadPin(ANALOG_JOYSTICK_Y_AXIS_PIN); // Read and convert joystick Y-axis data    
+        if(joystick_axis_is_enabled(0))
+        {
+            joystick_set_axis((uint8_t) 0, 0);
+            joystick_set_axis((uint8_t) 1, 0);
+            joystick_set_axis((uint8_t) 2, 0);
+            joystick_set_axis((uint8_t) 3, 0);
+            joystick_set_axis((uint8_t) 4, 0);
+            joystick_set_axis((uint8_t) 5, 0);
+
+            joystick_set_axis_enabled((uint8_t) 0, false);
+            joystick_set_axis_enabled((uint8_t) 1, false);
+            joystick_set_axis_enabled((uint8_t) 2, false);
+            joystick_set_axis_enabled((uint8_t) 3, false);
+            joystick_set_axis_enabled((uint8_t) 4, false);
+            joystick_set_axis_enabled((uint8_t) 5, false);
+        }
     }
 }
 
@@ -141,6 +174,17 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 				
 			}
 			return false;
+        // case KC_FNX:                                    
+        //     if(record->event.pressed){
+        //         fnx_layer_timer = timer_read();
+        //         register_mod(MOD_LSFT);
+        //     } else {
+        //         unregister_mod(MOD_LSFT);
+        //         if (timer_elapsed(fnx_layer_timer) < TAPPING_TERM) {  
+        //             layer_invert(_SYMB);
+        //         }
+        //     }
+        // return false;
 		default:
         return true;
     }
