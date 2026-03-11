@@ -10,4 +10,5 @@ JOYSTICK_DRIVER = analog
 #SPLIT_KEYBOARD = yes #seems to be set in keyboard.json
 TRANSACTION_ENABLE = yes
 
-CONSOLE_ENABLE = yes
+#CONSOLE_ENABLE = yes
+BOOTMAGIC_ENABLE = no

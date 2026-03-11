@@ -1,6 +1,17 @@
 #include "joystick.h"
 //#include "pointing_device.h"
 #include "transactions.h"
+
+// Layer index definitions (must match the order in keymap.json)
+#define LAYER_MAIN      0
+#define LAYER_SYM       1
+#define LAYER_NAV       2
+#define LAYER_MOUSE     3
+#define LAYER_NUMPAD    4
+#define LAYER_FUNCTION  5
+#define LAYER_GAMEPAD   6
+#define LAYER_WASD      7
+#define LAYER_RGB       8
 #include "quantum/split_common/transactions.h"
 #include "split_util.h"
 #include "quantum.h"
@@ -189,6 +200,56 @@ void apply_mouse_velocity(int16_t *x, int16_t *y) {
     *y = out_y;
 }
 
+// WASD joystick configuration
+// Threshold in raw ADC units from center (512) before a direction is considered pressed.
+// 200 ≈ 40 % deflection; increase for a tighter deadzone, decrease for more sensitivity.
+#define WASD_THRESHOLD 50
+
+// Per-key pressed state so we only call register/unregister on transitions
+static bool wasd_w_pressed = false;
+static bool wasd_a_pressed = false;
+static bool wasd_s_pressed = false;
+static bool wasd_d_pressed = false;
+
+// Release all WASD keys that are currently held by the joystick
+static void release_wasd_keys(void) {
+    if (wasd_w_pressed) { unregister_code(KC_W); wasd_w_pressed = false; }
+    if (wasd_a_pressed) { unregister_code(KC_A); wasd_a_pressed = false; }
+    if (wasd_s_pressed) { unregister_code(KC_S); wasd_s_pressed = false; }
+    if (wasd_d_pressed) { unregister_code(KC_D); wasd_d_pressed = false; }
+}
+
+// Map the main (master-side) joystick to WASD keys.
+// Diagonal positions naturally press two keys simultaneously.
+static void update_wasd_from_joystick(void) {
+    uint16_t raw_x = analogReadPin(ANALOG_JOYSTICK_X_AXIS_PIN);
+    uint16_t raw_y = analogReadPin(ANALOG_JOYSTICK_Y_AXIS_PIN);
+
+    int16_t offset_x = (int16_t)raw_x - 512;
+    int16_t offset_y = (int16_t)raw_y - 512;
+
+    // Joystick pushed up  → negative Y offset → W
+    // Joystick pushed down → positive Y offset → S
+    // Joystick pushed left → negative X offset → A
+    // Joystick pushed right → positive X offset → D
+    bool want_w = (offset_y < -WASD_THRESHOLD);
+    bool want_s = (offset_y >  WASD_THRESHOLD);
+    bool want_a = (offset_x < -WASD_THRESHOLD);
+    bool want_d = (offset_x >  WASD_THRESHOLD);
+
+    if (want_w && !wasd_w_pressed) { register_code(KC_W);   wasd_w_pressed = true;  }
+    if (!want_w && wasd_w_pressed) { unregister_code(KC_W); wasd_w_pressed = false; }
+
+    if (want_a && !wasd_a_pressed) { register_code(KC_A);   wasd_a_pressed = true;  }
+    if (!want_a && wasd_a_pressed) { unregister_code(KC_A); wasd_a_pressed = false; }
+
+    if (want_s && !wasd_s_pressed) { register_code(KC_S);   wasd_s_pressed = true;  }
+    if (!want_s && wasd_s_pressed) { unregister_code(KC_S); wasd_s_pressed = false; }
+
+    if (want_d && !wasd_d_pressed) { register_code(KC_D);   wasd_d_pressed = true;  }
+    if (!want_d && wasd_d_pressed) { unregister_code(KC_D); wasd_d_pressed = false; }
+}
+
 // Optional: Function to change velocity at runtime
 void set_mouse_velocity(float new_velocity) {
     // Clamp to min/max range
@@ -230,7 +291,7 @@ void set_mouse_velocity(float new_velocity) {
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) 
 {    
-    if (layer_state_is(4))
+    if (layer_state_is(LAYER_GAMEPAD))
     {
         // Ignore mouse reports when in joystick mode
         mouse_report.x = 0;
@@ -300,9 +361,9 @@ void user_sync_a_slave_handler(uint8_t in_buflen, const void* in_data, uint8_t o
 
 void keyboard_post_init_user(void) {
 
-    debug_enable=true;
-    debug_matrix=true;
-    debug_keyboard=true;
+    //debug_enable=true;
+    //debug_matrix=true;
+    //debug_keyboard=true;
 
     transaction_register_rpc(USER_SYNC_A, user_sync_a_slave_handler);
 
@@ -330,7 +391,7 @@ int16_t Scale_0_Max_to_NegRange_Range(int Value)
 
 void housekeeping_task_user(void) 
 {
-    if (layer_state_is(4))
+    if (layer_state_is(LAYER_GAMEPAD))
     {
         if(!joystick_axis_is_enabled(0))
         {
@@ -408,6 +469,16 @@ void housekeeping_task_user(void)
         {
             joystickData.x = (int) analogReadPin(ANALOG_JOYSTICK_X_AXIS_PIN); // Read and convert joystick X-axis data
             joystickData.y = (int) analogReadPin(ANALOG_JOYSTICK_Y_AXIS_PIN); // Read and convert joystick Y-axis data
+        }
+    }
+
+    // ── Layer 6: main joystick → WASD keys ─────────────────────────────────
+    if (is_keyboard_master()) {
+        if (layer_state_is(LAYER_WASD)) {
+            update_wasd_from_joystick();
+        } else {
+            // Release any joystick-held WASD keys when leaving LAYER_WASD
+            release_wasd_keys();
         }
     }
 }
