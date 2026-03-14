@@ -12,6 +12,17 @@
 #define LAYER_GAMEPAD   6
 #define LAYER_WASD      7
 #define LAYER_RGB       8
+
+// RGB matrix LED indices for indicator keys (from keyboard.json rgb_matrix.layout order)
+// Left side: 0-5 underglow, 6+ key LEDs
+#define LED_KEY_T 11  // matrix [1,4]
+// Right side: 27-32 underglow, 33+ key LEDs
+#define LED_KEY_N 38  // matrix [5,4]
+
+// Dark green color for the home-row indicators (R, G, B)
+#define INDICATOR_R 0
+#define INDICATOR_G 70
+#define INDICATOR_B 0
 #include "quantum/split_common/transactions.h"
 #include "split_util.h"
 #include "quantum.h"
@@ -481,6 +492,19 @@ void housekeeping_task_user(void)
             release_wasd_keys();
         }
     }
+}
+
+// Light T and N dark green whenever the main layer is the active layer
+bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    if (get_highest_layer(layer_state | default_layer_state) == LAYER_MAIN) {
+        if (led_min <= LED_KEY_T && LED_KEY_T < led_max) {
+            rgb_matrix_set_color(LED_KEY_T, INDICATOR_R, INDICATOR_G, INDICATOR_B);
+        }
+        if (led_min <= LED_KEY_N && LED_KEY_N < led_max) {
+            rgb_matrix_set_color(LED_KEY_N, INDICATOR_R, INDICATOR_G, INDICATOR_B);
+        }
+    }
+    return false;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
